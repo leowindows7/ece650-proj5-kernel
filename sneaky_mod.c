@@ -13,7 +13,7 @@
 
 //This is a pointer to the system call table
 static unsigned long *sys_call_table;
-
+// hello from new vm
 // Helper functions, turn on and off the PTE address protection mode
 // for syscall_table pointer
 int enable_page_rw(void *ptr){
